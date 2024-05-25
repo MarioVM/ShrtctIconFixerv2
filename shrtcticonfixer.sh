@@ -1,26 +1,34 @@
 # Path to your Gaming folder
 $folderPath = "C:\Gaming"
 
-# Refresh icon for each shortcut
 $shortcuts = Get-ChildItem -Path $folderPath -Filter *.lnk
 
 foreach ($shortcut in $shortcuts) {
     $shortcutPath = $shortcut.FullName
 
     try {
-        # Create a WScript.Shell COM object
         $wsh = New-Object -ComObject WScript.Shell
         $shortcutObject = $wsh.CreateShortcut($shortcutPath)
-
-        # Force icon refresh by setting and resetting the icon location
-        $originalIconLocation = $shortcutObject.IconLocation
-        $shortcutObject.IconLocation = "$env:windir\system32\shell32.dll,0"
-        $shortcutObject.Save()
         
-        # Restore the original icon location
-        $shortcutObject.IconLocation = $originalIconLocation
-        $shortcutObject.Save()
+        $targetPath = $shortcutObject.TargetPath
+        $targetFolder = Split-Path -Parent $targetPath
 
+        # Try to find an icon file first
+        $iconFile = Get-ChildItem -Path $targetFolder -Filter *.ico -ErrorAction SilentlyContinue | Select-Object -First 1
+
+        if ($iconFile) {
+            $shortcutObject.IconLocation = $iconFile.FullName
+        } else {
+            # If no icon file, try to find an executable file
+            $exeFile = Get-ChildItem -Path $targetFolder -Filter *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($exeFile) {
+                $shortcutObject.IconLocation = $exeFile.FullName
+            } else {
+                $shortcutObject.IconLocation = $targetPath
+            }
+        }
+
+        $shortcutObject.Save()
         Write-Host "Refreshed icon for: $shortcutPath"
     } catch {
         Write-Host "Failed to refresh icon for: $shortcutPath"
